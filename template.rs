@@ -1,7 +1,5 @@
 #![allow(unused)]
 #![allow(dead_code)]
-use std::fs;
-use std::env;
 
 fn part1(lines: &Vec<&str>) -> Option<i64> {
     //TODO: implement me
@@ -14,6 +12,8 @@ fn part2(lines: &Vec<&str>) -> Option<i64> {
 }
 
 fn main() {
+    use std::fs;
+    use std::env;
     use std::time::Instant;
     let args: Vec<String> =  env::args().collect();
     let infile = args.get(1).unwrap_or_else(|| {

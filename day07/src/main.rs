@@ -237,7 +237,7 @@ fn main() {
     });
     for (index, runresult) in results.into_iter().enumerate() {
         match runresult.value {
-            Some(result) => println!("Part {}: {}\t({:.3?} s)", index+1, result, runresult.elapsed.as_secs_f64()),
+            Some(result) => println!("Part {}: {}\t({:?})", index+1, result, runresult.elapsed),
             None => println!("Part {}: No result", index+1),
         }
     }

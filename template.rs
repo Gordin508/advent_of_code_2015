@@ -33,7 +33,7 @@ fn main() {
         let partstart = Instant::now();
         let result = part(&lines);
         match result {
-            Some(result) => println!("Part {}: {}\t({:.3?} s)", index+1, result, partstart.elapsed().as_secs_f64()),
+            Some(result) => println!("Part {}: {}\t({:?})", index+1, result, partstart.elapsed()),
             None => println!("Part {}: No result", index+1),
         }
     }

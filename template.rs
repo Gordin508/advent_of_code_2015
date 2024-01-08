@@ -38,3 +38,21 @@ fn main() {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    static TESTINPUT: &str = "CHANGEME";
+
+    #[test]
+    fn test_part1() {
+        let lines: Vec<&str> = TESTINPUT.lines().collect();
+        assert_eq!(Some(1337), part1(&lines));
+    }
+
+    #[test]
+    fn test_part2() {
+        let lines: Vec<&str> = TESTINPUT.lines().collect();
+        assert_eq!(Some(13337), part2(&lines));
+    }
+}

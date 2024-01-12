@@ -31,20 +31,22 @@ fn part1(lines: &Vec<&str>) -> Option<i64> {
     }
     None
 }
-fn comparator(key: &str, val1: Option<&i64>, val2: i64) -> bool {
-    if let Some(v1) = val1 {
-        if key == "cats" || key == "trees" {
-            return *v1 < val2;
-        } else if  key == "pomeranians" || key == "goldfish" {
-            return *v1 > val2;
-        }
-        return *v1 == val2
-    }
-    true
-}
 
 fn part2(lines: &Vec<&str>) -> Option<i64> {
     let facts = parse_facts(FACTS);
+
+    let comparator = |key: &str, val1: Option<&i64>, val2: i64| -> bool {
+        if let Some(v1) = val1 {
+            if key == "cats" || key == "trees" {
+                return *v1 < val2;
+            } else if key == "pomeranians" || key == "goldfish" {
+                return *v1 > val2;
+            }
+            return *v1 == val2;
+        }
+        true
+    };
+
     'lineloop: for (i, line) in lines.iter().enumerate() {
         let mfcsam = parse_facts(line);
         for (key, val) in mfcsam.iter() {

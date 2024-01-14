@@ -1,24 +1,7 @@
 #![allow(unused)]
 #![allow(dead_code)]
 
-use std::collections::BinaryHeap;
 use std::cmp::{max, min};
-
-#[derive(Debug, PartialOrd, Eq, PartialEq, Clone, Copy)]
-struct Effect {
-    until: usize,  // time step
-    heal: isize,
-    damage: isize,
-    armor: isize,
-    mana_gain: isize,
-    spell_type: Spell
-}
-
-impl std::cmp::Ord for Effect {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        other.until.cmp(&self.until)
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Boss {
@@ -41,54 +24,44 @@ impl From<&Vec<&str>> for Boss {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct Player {
     hp: isize,
     mana: isize,
-    effects: BinaryHeap<Effect>
-}
-
-impl Clone for Player {
-    fn clone(&self) -> Self {
-        let mut neweffects = BinaryHeap::new();
-        for effect in &self.effects {
-            neweffects.push(effect.clone());
-        }
-        Player{hp: self.hp, mana: self.mana, effects: neweffects}
-    }
+    poisonduration: usize,
+    armorduration: usize,
+    manaduration: usize
 }
 
 impl Player {
-    fn heal(&mut self) {
-        self.hp += self.get_heal();
+    fn new(hp: isize, mana: isize) -> Player {
+        Player{hp, mana, poisonduration: 0, armorduration: 0, manaduration: 0}
     }
     fn attack(&self, boss: &mut Boss) {
         boss.hp -= self.get_damage();
     }
-    fn update_effects(&mut self, step: usize) {
-        while let Some(effect) = self.effects.peek() {
-            if effect.until <= step {
-                self.effects.pop();
-            } else {
-                break;
-            }
+    fn update_effects(&mut self) {
+        if self.poisonduration > 0 {
+            self.poisonduration -= 1;
+        }
+        if self.armorduration > 0 {
+            self.armorduration -= 1;
+        }
+        if self.manaduration > 0 {
+            self.manaduration -= 1;
         }
     }
 
     fn get_damage(&self) -> isize {
-        self.effects.iter().fold(0, |acc, e| acc + e.damage)
+        if self.poisonduration > 0 { 3 } else { 0 }
     }
 
     fn get_armor(&self) -> isize {
-        self.effects.iter().fold(0, |acc, e| acc + e.armor)
-    }
-
-    fn get_heal(&self) -> isize {
-        self.effects.iter().fold(0, |acc, e| acc + e.heal)
+        if self.armorduration > 0 { 7 } else { 0 }
     }
 
     fn get_manaregen(&self) -> isize {
-        self.effects.iter().fold(0, |acc, e| acc + e.mana_gain)
+        if self.manaduration > 0 { 101 } else { 0 }  
     }
 }
 
@@ -128,7 +101,6 @@ impl Spell {
 
     fn cast(&self, player: &mut Player, boss: &mut Boss, step: usize) {
         assert!(player.mana >= self.cost());
-        player.mana -= self.cost();
         match self {
             Spell::MAGICMISSILE => {
                 boss.hp -= 4;
@@ -138,24 +110,33 @@ impl Spell {
                 player.hp += 2;
             },
             Spell::SHIELD => {
-                player.effects.push(Effect{until: step + 6, heal: 0, damage: 0, armor: 7, mana_gain: 0, spell_type: *self});
+                assert!(player.armorduration == 0);
+                player.armorduration = 6;
             },
             Spell::POISON => {
-                player.effects.push(Effect{until: step + 6, heal: 0, damage: 3, armor: 0, mana_gain: 0, spell_type: *self});
+                assert!(player.poisonduration == 0);
+                player.poisonduration = 6;
             },
             Spell::RECHARGE => {
-                player.effects.push(Effect{until: step + 5, heal: 0, damage: 0, armor: 0, mana_gain: 101, spell_type: *self});
+                assert!(player.manaduration == 0);
+                player.manaduration = 5;
             }
         };
-        player.update_effects(step + 1);
+        player.mana -= self.cost();
         player.mana += player.get_manaregen();
-        player.hp += player.get_heal();
         player.attack(boss);
+        player.update_effects();
         boss.attack(player);
     }
 }
 
-fn find_best_strategy(player: &Player, boss: &Boss) -> isize {
+#[derive(Debug, Eq, PartialEq)]
+enum Difficulty {
+    NORMAL,
+    HARD
+}
+
+fn find_best_strategy(player: &Player, boss: &Boss, difficulty: Difficulty) -> isize {
     let mut best: isize = isize::MAX;
     use std::collections::VecDeque;
     let mut queue  = VecDeque::new();
@@ -166,23 +147,22 @@ fn find_best_strategy(player: &Player, boss: &Boss) -> isize {
         }
         // someone died in last step?
         if frame.boss.hp <= 0 {
-            println!("Attack kill: Turn: {}, Player HP: {}, Boss HP: {}, spent: {}", frame.step, frame.player.hp, frame.boss.hp, frame.mana_spent);
-            println!("{:?}", frame.player.effects);
             best = min(best, frame.mana_spent);
             continue;
-        } else if frame.player.hp <= 0 {
+        } 
+        let mut nplayer = frame.player.clone();
+        if difficulty == Difficulty::HARD {
+            nplayer.hp -= 1;
+        }
+        if frame.player.hp <= 0 {
             continue;
         }
-        let mut nplayer = frame.player.clone();
         let mut nboss = frame.boss.clone();
         let nextstep = frame.step + 2;
-        nplayer.update_effects(frame.step);
         nplayer.mana += frame.player.get_manaregen();
-        nplayer.hp += frame.player.get_heal();
         nplayer.attack(&mut nboss);
+        nplayer.update_effects();
         if nboss.hp <= 0 {
-            println!("DOT kill: Turn: {}, Player HP: {}, Boss HP: {}, spent: {}", frame.step, frame.player.hp, nboss.hp, frame.mana_spent);
-            println!("{:?}", nplayer.effects);
             best = min(best, frame.mana_spent);
             continue;
         }
@@ -190,7 +170,9 @@ fn find_best_strategy(player: &Player, boss: &Boss) -> isize {
             if spell.cost() > frame.player.mana {
                 continue;
             }
-            if nplayer.effects.iter().any(|e| e.spell_type == *spell) {
+            if *spell == Spell::POISON && nplayer.poisonduration > 0
+                || *spell == Spell::SHIELD && nplayer.armorduration > 0
+                || *spell == Spell::RECHARGE && nplayer.manaduration > 0 {
                 continue;
             }
             let mut nextboss = nboss.clone();
@@ -203,15 +185,17 @@ fn find_best_strategy(player: &Player, boss: &Boss) -> isize {
 }
 
 fn part1(lines: &Vec<&str>) -> Option<i64> {
-    let player = Player{hp: 50, mana: 500, effects: BinaryHeap::new()};
+    let player = Player::new(50, 500);
     let boss = Boss::from(lines);
 
-    Some(find_best_strategy(&player, &boss) as i64)
+    Some(find_best_strategy(&player, &boss, Difficulty::NORMAL) as i64)
 }
 
 fn part2(lines: &Vec<&str>) -> Option<i64> {
-    //TODO: implement me
-    None
+    let player = Player::new(50, 500);
+    let boss = Boss::from(lines);
+
+    Some(find_best_strategy(&player, &boss, Difficulty::HARD) as i64)
 }
 
 fn main() {
@@ -248,20 +232,15 @@ mod tests {
 
     #[test]
     fn test_poison_missile() {
-        let player = Player{hp: 10, mana: 250, effects: BinaryHeap::new()};
+        let player = Player::new(10, 250);
         let boss = Boss{hp: 13, damage: 8};
-        assert_eq!(173 + 53, find_best_strategy(&player, &boss));
+        assert_eq!(173 + 53, find_best_strategy(&player, &boss, Difficulty::NORMAL));
     }
 
     #[test]
     fn test_medium() {
-        let player = Player{hp: 10, mana: 250, effects: BinaryHeap::new()};
+        let player = Player::new(10, 250);
         let boss = Boss{hp: 14, damage: 8};
-        assert_eq!(229 + 113 + 73 + 173 + 53, find_best_strategy(&player, &boss));
-    }
-
-    #[test]
-    #[ignore]
-    fn test_part2() {
+        assert_eq!(229 + 113 + 73 + 173 + 53, find_best_strategy(&player, &boss, Difficulty::NORMAL));
     }
 }
